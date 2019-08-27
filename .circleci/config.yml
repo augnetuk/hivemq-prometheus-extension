@@ -1,0 +1,41 @@
+version: 2
+jobs: 
+  build: 
+    
+    working_directory: ~/build
+
+    docker: # 
+      - image: circleci/openjdk:11-jdk-browsers 
+
+    steps:
+
+      - checkout 
+
+      - restore_cache: # restore the saved cache after the first run or if `pom.xml` has changed
+          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
+          keys:
+          - build-{{ checksum "pom.xml" }}
+          - build-
+      
+
+      - run:
+          name: Build
+          command: |
+            export GOOGLE_APPLICATION_CREDENTIALS=${HOME}/gcp-key.json
+            echo ${SERVICE_ACCOUNT} | base64 --decode -i > ${GOOGLE_APPLICATION_CREDENTIALS}
+            mvn -B verify deploy -Dmaven.bucket=augnet-dev-repo
+
+      - save_cache: # saves the project dependencies
+          paths:
+            - ~/.m2
+          key: build-{{ checksum "pom.xml" }}
+
+      - store_test_results: 
+          path: target/surefire-reports
+
+workflows:
+  version: 2
+  deploy_steps:
+    jobs:
+      - build:
+           context: dev
